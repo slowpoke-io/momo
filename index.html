@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>✈ Monica's Birthday Ticket</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,500;1,300;1,500&family=Noto+Serif+TC:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold: #c9a84c;
+      --gold-light: #e8c96a;
+      --gold-pale: #f5e6b8;
+      --navy: #080c1a;
+      --navy-mid: #0f1628;
+      --cream: #faf6ed;
+      --cream-dark: #f0e8d4;
+      --ink: #1a1206;
+      --stamp-red: #b83232;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--navy);
+      font-family: 'Space Mono', monospace;
+    }
+
+    /* ── STARFIELD ── */
+    #stars-canvas {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    }
+
+    /* ── SCENE ── */
+    .scene {
+      position: fixed; inset: 0; z-index: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 16px;
+    }
+
+    /* top label */
+    .top-label {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: clamp(12px, 3vw, 15px);
+      color: var(--gold);
+      letter-spacing: 0.15em;
+      margin-bottom: 18px;
+      opacity: 0;
+      transform: translateY(-12px);
+      animation: fadeUp 0.8s 0.3s forwards;
+    }
+
+    /* ── TICKET WRAPPER (3-D flip) ── */
+    .ticket-wrap {
+      width: 100%; max-width: 380px;
+      perspective: 1200px;
+      opacity: 0;
+      transform: translateY(40px) scale(0.94);
+      animation: dropIn 0.9s 0.7s cubic-bezier(.22,1,.36,1) forwards;
+    }
+
+    .ticket-float {
+      animation: floatTicket 3.6s ease-in-out infinite;
+    }
+    @keyframes floatTicket {
+      0%,100% { transform: translateY(0px); }
+      50%      { transform: translateY(-8px); }
+    }
+
+    .ticket-inner {
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.85s cubic-bezier(.65,0,.35,1);
+      will-change: transform;
+    }
+    .ticket-inner.flipped { transform: rotateY(180deg); }
+
+    /* shared face styles */
+    .ticket-face {
+      width: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,168,76,0.25);
+    }
+    .ticket-back-face {
+      position: absolute; top: 0; left: 0;
+      transform: rotateY(180deg);
+    }
+
+    /* ── FRONT ── */
+    .ticket-front {
+      background: var(--cream);
+      display: flex; flex-direction: column;
+    }
+
+    /* airline header */
+    .ticket-header {
+      background: var(--navy-mid);
+      padding: 14px 22px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .airline-name {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(13px, 3.5vw, 16px);
+      color: var(--gold);
+      letter-spacing: 0.25em;
+      font-weight: 700;
+    }
+    .plane-icon {
+      font-size: 22px;
+      animation: planeFly 4s ease-in-out infinite;
+    }
+    @keyframes planeFly {
+      0%,100% { transform: translateX(0) rotate(-5deg); }
+      50%      { transform: translateX(6px) rotate(5deg); }
+    }
+
+    /* route row */
+    .route-row {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      padding: 20px 22px 10px;
+      gap: 8px;
+    }
+    .airport-block { display: flex; flex-direction: column; gap: 2px; }
+    .airport-block.right { text-align: right; align-items: flex-end; }
+    .airport-label {
+      font-size: 9px; letter-spacing: 0.2em;
+      color: #8a7a60; text-transform: uppercase;
+    }
+    .airport-code {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(32px, 9vw, 42px);
+      font-weight: 700; color: var(--ink);
+      line-height: 1;
+    }
+    .airport-city {
+      font-size: 9px; letter-spacing: 0.1em;
+      color: #8a7a60; text-transform: uppercase;
+    }
+
+    /* destination mystery */
+    .dest-code {
+      position: relative; display: inline-block;
+    }
+    .dest-code .q-marks {
+      color: var(--gold);
+      text-shadow: 0 0 20px rgba(201,168,76,0.6);
+      animation: pulse 2.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { text-shadow: 0 0 10px rgba(201,168,76,0.4); opacity: 1; }
+      50%      { text-shadow: 0 0 28px rgba(201,168,76,0.9); opacity: 0.82; }
+    }
+
+    /* flight arrow */
+    .flight-arrow {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; gap: 3px; padding-bottom: 6px;
+    }
+    .arrow-line {
+      width: 100%; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold) 30%, var(--gold) 70%, transparent);
+    }
+    .arrow-plane { font-size: 16px; color: var(--gold); margin-top: -2px; }
+    .nonstop-label {
+      font-size: 8px; letter-spacing: 0.15em;
+      color: #aaa; text-transform: uppercase;
+    }
+
+    /* divider */
+    .perforation {
+      display: flex; align-items: center;
+      padding: 4px 0; margin: 0 -1px;
+      position: relative;
+    }
+    .perf-circle {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--navy);
+      flex-shrink: 0;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .perf-line {
+      flex: 1;
+      border-top: 2px dashed rgba(180,160,120,0.4);
+    }
+
+    /* info grid */
+    .info-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      padding: 12px 22px 14px; gap: 10px;
+    }
+    .info-cell { display: flex; flex-direction: column; gap: 3px; }
+    .info-cell.center { align-items: center; text-align: center; }
+    .info-cell.right  { align-items: flex-end; text-align: right; }
+    .cell-label {
+      font-size: 8px; letter-spacing: 0.18em; color: #8a7a60;
+      text-transform: uppercase;
+    }
+    .cell-value {
+      font-size: clamp(10px, 2.8vw, 12px);
+      font-weight: 700; color: var(--ink);
+      letter-spacing: 0.05em;
+    }
+    .cell-value.gold { color: var(--gold); }
+
+    /* boarding pass stub */
+    .stub {
+      background: var(--navy-mid);
+      padding: 14px 22px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .stub-text {
+      font-size: 9px; letter-spacing: 0.25em;
+      color: var(--gold); text-transform: uppercase;
+    }
+    .barcode {
+      display: flex; gap: 2px; align-items: flex-end;
+      height: 30px;
+    }
+    .barcode span {
+      background: var(--gold);
+      display: block;
+      border-radius: 1px;
+      opacity: 0.7;
+    }
+
+    /* tap hint */
+    .tap-hint {
+      margin-top: 20px;
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Noto Serif TC', serif;
+      font-style: normal;
+      font-size: clamp(13px, 3.5vw, 15px);
+      color: rgba(201,168,76,0.7);
+      opacity: 0;
+      animation: fadeUp 0.8s 1.6s forwards, shimmerText 3s 2.4s ease-in-out infinite;
+      cursor: pointer;
+      user-select: none;
+    }
+    @keyframes shimmerText {
+      0%,100% { color: rgba(201,168,76,0.65); }
+      50%      { color: rgba(232,201,106,1); }
+    }
+    .tap-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--gold);
+      animation: blink 1.5s 2.4s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.3; transform: scale(0.6); }
+    }
+
+    /* ── BACK FACE ── */
+    .ticket-back {
+      background: linear-gradient(145deg, #0d1224 0%, #12182e 100%);
+      border: 1px solid rgba(201,168,76,0.25);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: space-between;
+      padding: 28px 26px 24px;
+      min-height: 420px;
+    }
+
+    .back-top { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .back-stamp {
+      width: 80px; height: 80px; border-radius: 50%;
+      border: 2.5px solid var(--stamp-red);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--stamp-red);
+      transform: rotate(-12deg);
+      opacity: 0;
+      transition: opacity 0.6s 0.5s, transform 0.6s 0.5s;
+    }
+    .flipped ~ * .back-stamp,
+    .ticket-inner.flipped .back-stamp {
+      opacity: 1; transform: rotate(-12deg) scale(1);
+    }
+    .stamp-text-top { font-size: 6px; letter-spacing: 0.25em; text-transform: uppercase; }
+    .stamp-big { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; }
+    .stamp-date { font-size: 7px; }
+
+    .back-divider {
+      width: 60%; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      margin: 4px 0;
+    }
+
+    .back-title {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: clamp(22px, 6vw, 28px);
+      color: var(--gold-light);
+      text-align: center;
+      line-height: 1.3;
+      margin-top: 4px;
+    }
+    .back-subtitle {
+      font-family: 'Noto Serif TC', serif;
+      font-size: clamp(11px, 3vw, 13px);
+      color: rgba(245,230,184,0.5);
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+    }
+
+    .back-message {
+      font-family: 'Noto Serif TC', serif;
+      font-size: clamp(16px, 4.4vw, 20px);
+      font-weight: 300;
+      color: rgba(245,230,184,0.88);
+      text-align: center;
+      line-height: 2;
+      padding: 0 4px;
+      letter-spacing: 0.06em;
+    }
+    .back-message em {
+      font-style: normal;
+      color: var(--gold-light);
+      text-shadow: 0 0 12px rgba(201,168,76,0.4);
+    }
+
+    .back-footer {
+      width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    .back-footer-divider {
+      width: 100%; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(201,168,76,0.3), transparent);
+    }
+    .back-details {
+      display: flex; justify-content: space-between; width: 100%;
+    }
+    .back-detail { display: flex; flex-direction: column; gap: 2px; }
+    .back-detail.center { align-items: center; }
+    .back-detail.right { align-items: flex-end; }
+    .bd-label { font-size: 8px; letter-spacing: 0.2em; color: rgba(201,168,76,0.45); text-transform: uppercase; }
+    .bd-value { font-size: clamp(10px, 2.8vw, 12px); color: rgba(245,230,184,0.75); letter-spacing: 0.05em; }
+
+    .back-cta {
+      background: transparent;
+      border: 1.5px solid var(--gold);
+      color: var(--gold);
+      font-family: 'Space Mono', monospace;
+      font-size: 10px; letter-spacing: 0.25em;
+      text-transform: uppercase;
+      padding: 10px 28px;
+      border-radius: 40px;
+      cursor: pointer;
+      transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+      margin-top: 4px;
+    }
+    .back-cta:hover, .back-cta:active {
+      background: var(--gold);
+      color: var(--navy);
+      box-shadow: 0 0 20px rgba(201,168,76,0.4);
+    }
+
+    /* confetti overlay */
+    #confetti-canvas {
+      position: fixed; inset: 0; z-index: 10;
+      pointer-events: none; opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #confetti-canvas.active { opacity: 1; }
+
+    /* ── KEYFRAMES ── */
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes dropIn {
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* desktop centering */
+    @media (min-width: 480px) {
+      .ticket-wrap { max-width: 400px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="stars-canvas"></canvas>
+<canvas id="confetti-canvas"></canvas>
+
+<div class="scene">
+  <p class="top-label">✦ A Birthday Surprise for You ✦</p>
+
+  <div class="ticket-wrap" id="ticketWrap">
+    <div class="ticket-float">
+    <div class="ticket-inner" id="ticketInner">
+
+      <!-- FRONT FACE -->
+      <div class="ticket-face ticket-front" id="ticketFront">
+
+        <div class="ticket-header">
+          <span class="airline-name">MONICA AIR</span>
+          <span class="plane-icon">✈</span>
+        </div>
+
+        <div class="route-row">
+          <div class="airport-block">
+            <span class="airport-label">From</span>
+            <span class="airport-code">TPE</span>
+            <span class="airport-city">Taipei</span>
+          </div>
+
+          <div class="flight-arrow">
+            <div class="arrow-line"></div>
+            <span class="arrow-plane">✈</span>
+            <span class="nonstop-label">Nonstop</span>
+          </div>
+
+          <div class="airport-block right">
+            <span class="airport-label">To</span>
+            <span class="airport-code dest-code">
+              <span class="q-marks">???</span>
+            </span>
+            <span class="airport-city">Your Choice</span>
+          </div>
+        </div>
+
+        <div class="perforation">
+          <div class="perf-circle"></div>
+          <div class="perf-line"></div>
+          <div class="perf-circle"></div>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-cell">
+            <span class="cell-label">Passenger</span>
+            <span class="cell-value">MONICA</span>
+          </div>
+          <div class="info-cell center">
+            <span class="cell-label">Birthday</span>
+            <span class="cell-value gold" style="font-size:clamp(12px,3.4vw,15px);letter-spacing:0.08em">05 · 03</span>
+          </div>
+          <div class="info-cell right">
+            <span class="cell-label">Seat</span>
+            <span class="cell-value">TOGETHER</span>
+          </div>
+
+          <div class="info-cell">
+            <span class="cell-label">Class</span>
+            <span class="cell-value">BIRTHDAY</span>
+          </div>
+          <div class="info-cell center">
+            <span class="cell-label">Flight</span>
+            <span class="cell-value">MN-0503</span>
+          </div>
+          <div class="info-cell right">
+            <span class="cell-label">Gate</span>
+            <span class="cell-value gold">∞</span>
+          </div>
+        </div>
+
+        <div class="stub">
+          <span class="stub-text">Boarding Pass</span>
+          <div class="barcode" id="barcode"></div>
+        </div>
+      </div>
+
+      <!-- BACK FACE -->
+      <div class="ticket-face ticket-back-face ticket-back" id="ticketBack">
+
+        <div class="back-top">
+          <div class="back-stamp" id="backStamp">
+            <span class="stamp-text-top">Birthday</span>
+            <span class="stamp-big">05·03</span>
+            <span class="stamp-date">Monica</span>
+          </div>
+          <div class="back-divider"></div>
+          <p class="back-subtitle">Happy Birthday</p>
+          <h1 class="back-title">妞 ✦</h1>
+        </div>
+
+        <p class="back-message">
+          你決定目的地，<br/>
+          機票我來出，<br/>
+          <em>我們一起去！</em><br/><br/>
+          因為最好的旅程，<br/>
+          就是和你一起出發。
+        </p>
+
+        <div class="back-footer">
+          <div class="back-footer-divider"></div>
+          <div class="back-details">
+            <div class="back-detail">
+              <span class="bd-label">From</span>
+              <span class="bd-value">TPE · Taipei</span>
+            </div>
+            <div class="back-detail center">
+              <span class="bd-label">Destination</span>
+              <span class="bd-value" style="color:var(--gold)">Anywhere ✈</span>
+            </div>
+            <div class="back-detail right">
+              <span class="bd-label">Expires</span>
+              <span class="bd-value">Never</span>
+            </div>
+          </div>
+          <button class="back-cta" id="backBtn">← Flip Back</button>
+        </div>
+      </div>
+
+    </div><!-- ticket-inner -->
+    </div><!-- ticket-float -->
+  </div><!-- ticket-wrap -->
+
+  <div class="tap-hint" id="tapHint" onclick="flipTicket()">
+    <span class="tap-dot"></span>
+    輕點機票，開啟你的禮物
+    <span class="tap-dot"></span>
+  </div>
+</div>
+
+<script>
+/* ── STARS ── */
+(function(){
+  const c = document.getElementById('stars-canvas');
+  const ctx = c.getContext('2d');
+  let stars = [];
+
+  function resize(){
+    c.width = innerWidth; c.height = innerHeight;
+    stars = Array.from({length:180}, () => ({
+      x: Math.random()*innerWidth,
+      y: Math.random()*innerHeight,
+      r: Math.random()*1.4 + 0.2,
+      a: Math.random(),
+      speed: Math.random()*0.008 + 0.003,
+      phase: Math.random()*Math.PI*2
+    }));
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function draw(t){
+    ctx.clearRect(0,0,c.width,c.height);
+    stars.forEach(s => {
+      s.a = 0.3 + 0.7 * Math.abs(Math.sin(t * s.speed + s.phase));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(245,230,184,${s.a})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+/* ── BARCODE ── */
+(function(){
+  const bc = document.getElementById('barcode');
+  const heights = [28,18,28,14,22,28,16,24,28,20,26,14,28,18,28,20,14,28,22,26,16];
+  const widths  = [2,1,2,1,1,2,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1];
+  heights.forEach((h,i)=>{
+    const s = document.createElement('span');
+    s.style.height = h+'px';
+    s.style.width  = widths[i]+'px';
+    bc.appendChild(s);
+  });
+})();
+
+/* ── FLIP ── */
+let flipped = false;
+const inner = document.getElementById('ticketInner');
+const hint  = document.getElementById('tapHint');
+const backBtn = document.getElementById('backBtn');
+const backStamp = document.getElementById('backStamp');
+const confCanvas = document.getElementById('confetti-canvas');
+
+function flipTicket(){
+  flipped = !flipped;
+  inner.classList.toggle('flipped', flipped);
+  hint.style.display = flipped ? 'none' : 'flex';
+
+  if(flipped){
+    // stamp reveal
+    setTimeout(()=>{ backStamp.style.opacity='1'; }, 600);
+    launchConfetti();
+  } else {
+    backStamp.style.opacity='0';
+    stopConfetti();
+  }
+}
+
+document.getElementById('ticketFront').addEventListener('click', flipTicket);
+backBtn.addEventListener('click', (e)=>{ e.stopPropagation(); flipTicket(); });
+document.getElementById('ticketBack').addEventListener('click', (e)=>{
+  if(e.target === backBtn || backBtn.contains(e.target)) return;
+});
+
+/* ── CONFETTI ── */
+let confParts = [];
+let confRAF = null;
+let confActive = false;
+
+function launchConfetti(){
+  confActive = true;
+  confCanvas.classList.add('active');
+  confCanvas.width = innerWidth; confCanvas.height = innerHeight;
+  const colors = ['#c9a84c','#e8c96a','#f5e6b8','#ffffff','#d4a843','#ffeaa7','#ffe066','#ffd700'];
+  confParts = Array.from({length:130}, ()=>({
+    x: Math.random()*innerWidth,
+    y: -20 - Math.random()*260,
+    vx: (Math.random()-0.5)*2.5,
+    vy: 1.4 + Math.random()*2.2,
+    color: colors[Math.floor(Math.random()*colors.length)],
+    w: 5+Math.random()*7, h: 8+Math.random()*9,
+    rot: Math.random()*Math.PI*2,
+    rotV: (Math.random()-0.5)*0.18,
+    life: 1
+  }));
+  drawConfetti();
+  setTimeout(stopConfetti, 6000);
+}
+function stopConfetti(){
+  confActive = false;
+  confCanvas.classList.remove('active');
+  if(confRAF){ cancelAnimationFrame(confRAF); confRAF=null; }
+}
+function drawConfetti(){
+  if(!confActive) return;
+  const ctx = confCanvas.getContext('2d');
+  ctx.clearRect(0,0,confCanvas.width,confCanvas.height);
+  confParts.forEach(p=>{
+    p.x += p.vx; p.y += p.vy; p.rot += p.rotV;
+    // fade out only near very bottom
+    if(p.y > confCanvas.height * 0.8) p.life = Math.max(0, p.life - 0.018);
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+    ctx.restore();
+  });
+  confRAF = requestAnimationFrame(drawConfetti);
+}
+</script>
+</body>
+</html>
