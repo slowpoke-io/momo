@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>✈ Monica's Birthday Ticket</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,500;1,300;1,500&family=Noto+Serif+TC:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&family=Noto+Serif+TC:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -16,7 +16,6 @@
       --navy: #080c1a;
       --navy-mid: #0f1628;
       --cream: #faf6ed;
-      --cream-dark: #f0e8d4;
       --ink: #1a1206;
       --stamp-red: #b83232;
     }
@@ -26,14 +25,15 @@
       overflow: hidden;
       background: var(--navy);
       font-family: 'Space Mono', monospace;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
-    /* ── STARFIELD ── */
     #stars-canvas {
       position: fixed; inset: 0; z-index: 0; pointer-events: none;
     }
 
-    /* ── SCENE ── */
     .scene {
       position: fixed; inset: 0; z-index: 1;
       display: flex; flex-direction: column;
@@ -41,7 +41,6 @@
       padding: 16px;
     }
 
-    /* top label */
     .top-label {
       font-family: 'Playfair Display', serif;
       font-style: italic;
@@ -54,23 +53,33 @@
       animation: fadeUp 0.8s 0.3s forwards;
     }
 
-    /* ── TICKET WRAPPER (3-D flip) ── */
+    /* ── TICKET STACK ── */
+    .card-group {
+      display: flex; flex-direction: column; align-items: center;
+      width: 100%;
+      transform: translateY(0);
+      transition: transform 0.75s cubic-bezier(.65,0,.35,1);
+    }
+    .card-group.shifted { transform: translateY(-52px); }
+
     .ticket-wrap {
       width: 100%; max-width: 380px;
-      perspective: 1200px;
+      perspective: 900px;
+      perspective-origin: 50% 50%;
       opacity: 0;
       transform: translateY(40px) scale(0.94);
       animation: dropIn 0.9s 0.7s cubic-bezier(.22,1,.36,1) forwards;
     }
 
+    /* float + tilt controlled by JS */
     .ticket-float {
-      animation: floatTicket 3.6s ease-in-out infinite;
+      transform-style: preserve-3d;
+      will-change: transform;
+      cursor: grab;
     }
-    @keyframes floatTicket {
-      0%,100% { transform: translateY(0px); }
-      50%      { transform: translateY(-8px); }
-    }
+    .ticket-float:active { cursor: grabbing; }
 
+    /* flip only */
     .ticket-inner {
       position: relative;
       transform-style: preserve-3d;
@@ -79,27 +88,42 @@
     }
     .ticket-inner.flipped { transform: rotateY(180deg); }
 
-    /* shared face styles */
+    /* shared face */
     .ticket-face {
       width: 100%;
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
       border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,168,76,0.25);
+      position: relative;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.75), 0 0 0 1px rgba(201,168,76,0.2);
     }
     .ticket-back-face {
-      position: absolute; top: 0; left: 0;
+      position: absolute; top: 0; left: 0; width: 100%;
       transform: rotateY(180deg);
     }
 
-    /* ── FRONT ── */
-    .ticket-front {
-      background: var(--cream);
-      display: flex; flex-direction: column;
+    /* ── GLARE (moves with finger) ── */
+    .glare {
+      position: absolute; inset: 0;
+      border-radius: 18px;
+      pointer-events: none; z-index: 10;
+      opacity: 0;
+      mix-blend-mode: screen;
     }
 
-    /* airline header */
+    /* ── HOLOGRAPHIC SHIMMER ── */
+    .holo {
+      position: absolute; inset: 0;
+      border-radius: 18px;
+      pointer-events: none; z-index: 9;
+      opacity: 0;
+      mix-blend-mode: screen;
+    }
+
+    /* ── FRONT ── */
+    .ticket-front { background: var(--cream); display: flex; flex-direction: column; }
+
     .ticket-header {
       background: var(--navy-mid);
       padding: 14px 22px 12px;
@@ -108,9 +132,7 @@
     .airline-name {
       font-family: 'Playfair Display', serif;
       font-size: clamp(13px, 3.5vw, 16px);
-      color: var(--gold);
-      letter-spacing: 0.25em;
-      font-weight: 700;
+      color: var(--gold); letter-spacing: 0.25em; font-weight: 700;
     }
     .plane-icon {
       font-size: 22px;
@@ -121,36 +143,22 @@
       50%      { transform: translateX(6px) rotate(5deg); }
     }
 
-    /* route row */
     .route-row {
       display: flex; align-items: flex-end; justify-content: space-between;
-      padding: 20px 22px 10px;
-      gap: 8px;
+      padding: 20px 22px 10px; gap: 8px;
     }
     .airport-block { display: flex; flex-direction: column; gap: 2px; }
     .airport-block.right { text-align: right; align-items: flex-end; }
-    .airport-label {
-      font-size: 9px; letter-spacing: 0.2em;
-      color: #8a7a60; text-transform: uppercase;
-    }
+    .airport-label { font-size: 9px; letter-spacing: 0.2em; color: #8a7a60; text-transform: uppercase; }
     .airport-code {
       font-family: 'Playfair Display', serif;
       font-size: clamp(32px, 9vw, 42px);
-      font-weight: 700; color: var(--ink);
-      line-height: 1;
+      font-weight: 700; color: var(--ink); line-height: 1;
     }
-    .airport-city {
-      font-size: 9px; letter-spacing: 0.1em;
-      color: #8a7a60; text-transform: uppercase;
-    }
+    .airport-city { font-size: 9px; letter-spacing: 0.1em; color: #8a7a60; text-transform: uppercase; }
 
-    /* destination mystery */
-    .dest-code {
-      position: relative; display: inline-block;
-    }
-    .dest-code .q-marks {
+    .q-marks {
       color: var(--gold);
-      text-shadow: 0 0 20px rgba(201,168,76,0.6);
       animation: pulse 2.2s ease-in-out infinite;
     }
     @keyframes pulse {
@@ -158,7 +166,6 @@
       50%      { text-shadow: 0 0 28px rgba(201,168,76,0.9); opacity: 0.82; }
     }
 
-    /* flight arrow */
     .flight-arrow {
       flex: 1; display: flex; flex-direction: column;
       align-items: center; gap: 3px; padding-bottom: 6px;
@@ -168,29 +175,18 @@
       background: linear-gradient(90deg, transparent, var(--gold) 30%, var(--gold) 70%, transparent);
     }
     .arrow-plane { font-size: 16px; color: var(--gold); margin-top: -2px; }
-    .nonstop-label {
-      font-size: 8px; letter-spacing: 0.15em;
-      color: #aaa; text-transform: uppercase;
-    }
+    .nonstop-label { font-size: 8px; letter-spacing: 0.15em; color: #aaa; text-transform: uppercase; }
 
-    /* divider */
     .perforation {
-      display: flex; align-items: center;
-      padding: 4px 0; margin: 0 -1px;
-      position: relative;
+      display: flex; align-items: center; padding: 4px 0; margin: 0 -1px;
     }
     .perf-circle {
       width: 22px; height: 22px; border-radius: 50%;
-      background: var(--navy);
-      flex-shrink: 0;
+      background: var(--navy); flex-shrink: 0;
       box-shadow: inset 0 2px 6px rgba(0,0,0,0.4);
     }
-    .perf-line {
-      flex: 1;
-      border-top: 2px dashed rgba(180,160,120,0.4);
-    }
+    .perf-line { flex: 1; border-top: 2px dashed rgba(180,160,120,0.4); }
 
-    /* info grid */
     .info-grid {
       display: grid; grid-template-columns: 1fr 1fr 1fr;
       padding: 12px 22px 14px; gap: 10px;
@@ -198,66 +194,19 @@
     .info-cell { display: flex; flex-direction: column; gap: 3px; }
     .info-cell.center { align-items: center; text-align: center; }
     .info-cell.right  { align-items: flex-end; text-align: right; }
-    .cell-label {
-      font-size: 8px; letter-spacing: 0.18em; color: #8a7a60;
-      text-transform: uppercase;
-    }
-    .cell-value {
-      font-size: clamp(10px, 2.8vw, 12px);
-      font-weight: 700; color: var(--ink);
-      letter-spacing: 0.05em;
-    }
+    .cell-label { font-size: 8px; letter-spacing: 0.18em; color: #8a7a60; text-transform: uppercase; }
+    .cell-value { font-size: clamp(10px, 2.8vw, 12px); font-weight: 700; color: var(--ink); letter-spacing: 0.05em; }
     .cell-value.gold { color: var(--gold); }
 
-    /* boarding pass stub */
     .stub {
-      background: var(--navy-mid);
-      padding: 14px 22px;
+      background: var(--navy-mid); padding: 14px 22px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .stub-text {
-      font-size: 9px; letter-spacing: 0.25em;
-      color: var(--gold); text-transform: uppercase;
-    }
-    .barcode {
-      display: flex; gap: 2px; align-items: flex-end;
-      height: 30px;
-    }
-    .barcode span {
-      background: var(--gold);
-      display: block;
-      border-radius: 1px;
-      opacity: 0.7;
-    }
+    .stub-text { font-size: 9px; letter-spacing: 0.25em; color: var(--gold); text-transform: uppercase; }
+    .barcode { display: flex; gap: 2px; align-items: flex-end; height: 30px; }
+    .barcode span { background: var(--gold); display: block; border-radius: 1px; opacity: 0.7; }
 
-    /* tap hint */
-    .tap-hint {
-      margin-top: 20px;
-      display: flex; align-items: center; gap: 8px;
-      font-family: 'Noto Serif TC', serif;
-      font-style: normal;
-      font-size: clamp(13px, 3.5vw, 15px);
-      color: rgba(201,168,76,0.7);
-      opacity: 0;
-      animation: fadeUp 0.8s 1.6s forwards, shimmerText 3s 2.4s ease-in-out infinite;
-      cursor: pointer;
-      user-select: none;
-    }
-    @keyframes shimmerText {
-      0%,100% { color: rgba(201,168,76,0.65); }
-      50%      { color: rgba(232,201,106,1); }
-    }
-    .tap-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--gold);
-      animation: blink 1.5s 2.4s ease-in-out infinite;
-    }
-    @keyframes blink {
-      0%,100% { opacity: 1; transform: scale(1); }
-      50%      { opacity: 0.3; transform: scale(0.6); }
-    }
-
-    /* ── BACK FACE ── */
+    /* ── BACK ── */
     .ticket-back {
       background: linear-gradient(145deg, #0d1224 0%, #12182e 100%);
       border: 1px solid rgba(201,168,76,0.25);
@@ -273,14 +222,8 @@
       border: 2.5px solid var(--stamp-red);
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      color: var(--stamp-red);
-      transform: rotate(-12deg);
-      opacity: 0;
-      transition: opacity 0.6s 0.5s, transform 0.6s 0.5s;
-    }
-    .flipped ~ * .back-stamp,
-    .ticket-inner.flipped .back-stamp {
-      opacity: 1; transform: rotate(-12deg) scale(1);
+      color: var(--stamp-red); transform: rotate(-12deg);
+      opacity: 0; transition: opacity 0.6s 0.5s;
     }
     .stamp-text-top { font-size: 6px; letter-spacing: 0.25em; text-transform: uppercase; }
     .stamp-big { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; }
@@ -291,95 +234,84 @@
       background: linear-gradient(90deg, transparent, var(--gold), transparent);
       margin: 4px 0;
     }
-
-    .back-title {
-      font-family: 'Playfair Display', serif;
-      font-style: italic;
-      font-size: clamp(22px, 6vw, 28px);
-      color: var(--gold-light);
-      text-align: center;
-      line-height: 1.3;
-      margin-top: 4px;
-    }
     .back-subtitle {
       font-family: 'Noto Serif TC', serif;
       font-size: clamp(11px, 3vw, 13px);
-      color: rgba(245,230,184,0.5);
-      letter-spacing: 0.28em;
-      text-transform: uppercase;
+      color: rgba(245,230,184,0.5); letter-spacing: 0.28em; text-transform: uppercase;
+    }
+    .back-title {
+      font-family: 'Playfair Display', serif; font-style: italic;
+      font-size: clamp(22px, 6vw, 28px);
+      color: var(--gold-light); text-align: center; line-height: 1.3; margin-top: 4px;
     }
 
     .back-message {
       font-family: 'Noto Serif TC', serif;
-      font-size: clamp(16px, 4.4vw, 20px);
-      font-weight: 300;
+      font-size: clamp(16px, 4.4vw, 20px); font-weight: 300;
       color: rgba(245,230,184,0.88);
-      text-align: center;
-      line-height: 2;
-      padding: 0 4px;
-      letter-spacing: 0.06em;
+      text-align: center; line-height: 2; padding: 0 4px; letter-spacing: 0.06em;
     }
     .back-message em {
-      font-style: normal;
-      color: var(--gold-light);
+      font-style: normal; color: var(--gold-light);
       text-shadow: 0 0 12px rgba(201,168,76,0.4);
     }
 
-    .back-footer {
-      width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px;
-    }
+    .back-footer { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
     .back-footer-divider {
       width: 100%; height: 1px;
       background: linear-gradient(90deg, transparent, rgba(201,168,76,0.3), transparent);
     }
-    .back-details {
-      display: flex; justify-content: space-between; width: 100%;
-    }
+    .back-details { display: flex; justify-content: space-between; width: 100%; }
     .back-detail { display: flex; flex-direction: column; gap: 2px; }
     .back-detail.center { align-items: center; }
-    .back-detail.right { align-items: flex-end; }
+    .back-detail.right  { align-items: flex-end; }
     .bd-label { font-size: 8px; letter-spacing: 0.2em; color: rgba(201,168,76,0.45); text-transform: uppercase; }
     .bd-value { font-size: clamp(10px, 2.8vw, 12px); color: rgba(245,230,184,0.75); letter-spacing: 0.05em; }
 
     .back-cta {
-      background: transparent;
-      border: 1.5px solid var(--gold);
-      color: var(--gold);
-      font-family: 'Space Mono', monospace;
-      font-size: 10px; letter-spacing: 0.25em;
-      text-transform: uppercase;
-      padding: 10px 28px;
-      border-radius: 40px;
-      cursor: pointer;
-      transition: background 0.3s, color 0.3s, box-shadow 0.3s;
-      margin-top: 4px;
+      background: transparent; border: 1.5px solid var(--gold);
+      color: var(--gold); font-family: 'Space Mono', monospace;
+      font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase;
+      padding: 10px 28px; border-radius: 40px; cursor: pointer;
+      transition: background 0.3s, color 0.3s, box-shadow 0.3s; margin-top: 4px;
     }
     .back-cta:hover, .back-cta:active {
-      background: var(--gold);
-      color: var(--navy);
+      background: var(--gold); color: var(--navy);
       box-shadow: 0 0 20px rgba(201,168,76,0.4);
     }
 
-    /* confetti overlay */
+    /* ── HINT ── */
+    .tap-hint {
+      margin-top: 20px; display: flex; align-items: center; gap: 8px;
+      font-family: 'Noto Serif TC', serif;
+      font-size: clamp(13px, 3.5vw, 15px); color: rgba(201,168,76,0.7);
+      opacity: 0;
+      animation: fadeUp 0.8s 1.6s forwards, shimmerText 3s 2.4s ease-in-out infinite;
+      cursor: pointer; user-select: none;
+    }
+    @keyframes shimmerText {
+      0%,100% { color: rgba(201,168,76,0.65); }
+      50%      { color: rgba(232,201,106,1); }
+    }
+    .tap-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--gold);
+      animation: blink 1.5s 2.4s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.3; transform: scale(0.6); }
+    }
+
     #confetti-canvas {
       position: fixed; inset: 0; z-index: 10;
-      pointer-events: none; opacity: 0;
-      transition: opacity 0.3s;
+      pointer-events: none; opacity: 0; transition: opacity 0.3s;
     }
     #confetti-canvas.active { opacity: 1; }
 
-    /* ── KEYFRAMES ── */
-    @keyframes fadeUp {
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes dropIn {
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
+    @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+    @keyframes dropIn { to { opacity: 1; transform: translateY(0) scale(1); } }
 
-    /* desktop centering */
-    @media (min-width: 480px) {
-      .ticket-wrap { max-width: 400px; }
-    }
+    @media (min-width: 480px) { .ticket-wrap { max-width: 400px; } }
   </style>
 </head>
 <body>
@@ -388,258 +320,291 @@
 <canvas id="confetti-canvas"></canvas>
 
 <div class="scene">
+  <div class="card-group" id="cardGroup">
   <p class="top-label">✦ A Birthday Surprise for You ✦</p>
 
   <div class="ticket-wrap" id="ticketWrap">
-    <div class="ticket-float">
-    <div class="ticket-inner" id="ticketInner">
+    <div class="ticket-float" id="ticketFloat">
+      <div class="ticket-inner" id="ticketInner">
 
-      <!-- FRONT FACE -->
-      <div class="ticket-face ticket-front" id="ticketFront">
+        <!-- FRONT -->
+        <div class="ticket-face ticket-front" id="ticketFront">
+          <div class="glare" id="glareFront"></div>
+          <div class="holo"  id="holoFront"></div>
 
-        <div class="ticket-header">
-          <span class="airline-name">MONICA AIR</span>
-          <span class="plane-icon">✈</span>
+          <div class="ticket-header">
+            <span class="airline-name">MONICA AIR</span>
+            <span class="plane-icon">✈</span>
+          </div>
+          <div class="route-row">
+            <div class="airport-block">
+              <span class="airport-label">From</span>
+              <span class="airport-code">TPE</span>
+              <span class="airport-city">Taipei</span>
+            </div>
+            <div class="flight-arrow">
+              <div class="arrow-line"></div>
+              <span class="arrow-plane">✈</span>
+              <span class="nonstop-label">Nonstop</span>
+            </div>
+            <div class="airport-block right">
+              <span class="airport-label">To</span>
+              <span class="airport-code"><span class="q-marks">???</span></span>
+              <span class="airport-city">Your Choice</span>
+            </div>
+          </div>
+          <div class="perforation">
+            <div class="perf-circle"></div>
+            <div class="perf-line"></div>
+            <div class="perf-circle"></div>
+          </div>
+          <div class="info-grid">
+            <div class="info-cell">
+              <span class="cell-label">Passenger</span>
+              <span class="cell-value">MONICA</span>
+            </div>
+            <div class="info-cell center">
+              <span class="cell-label">Birthday</span>
+              <span class="cell-value gold" style="font-size:clamp(12px,3.4vw,15px);letter-spacing:0.08em">05 · 03</span>
+            </div>
+            <div class="info-cell right">
+              <span class="cell-label">Seat</span>
+              <span class="cell-value">TOGETHER</span>
+            </div>
+            <div class="info-cell">
+              <span class="cell-label">Class</span>
+              <span class="cell-value">BIRTHDAY</span>
+            </div>
+            <div class="info-cell center">
+              <span class="cell-label">Flight</span>
+              <span class="cell-value">MN-0503</span>
+            </div>
+            <div class="info-cell right">
+              <span class="cell-label">Gate</span>
+              <span class="cell-value gold">∞</span>
+            </div>
+          </div>
+          <div class="stub">
+            <span class="stub-text">Boarding Pass</span>
+            <div class="barcode" id="barcode"></div>
+          </div>
         </div>
 
-        <div class="route-row">
-          <div class="airport-block">
-            <span class="airport-label">From</span>
-            <span class="airport-code">TPE</span>
-            <span class="airport-city">Taipei</span>
+        <!-- BACK -->
+        <div class="ticket-face ticket-back-face ticket-back" id="ticketBack">
+          <div class="glare" id="glareBack"></div>
+
+          <div class="back-top">
+            <div class="back-stamp" id="backStamp">
+              <span class="stamp-text-top">Birthday</span>
+              <span class="stamp-big">05·03</span>
+              <span class="stamp-date">Monica</span>
+            </div>
+            <div class="back-divider"></div>
+            <p class="back-subtitle">Happy Birthday</p>
+            <h1 class="back-title">妞 ✦</h1>
           </div>
 
-          <div class="flight-arrow">
-            <div class="arrow-line"></div>
-            <span class="arrow-plane">✈</span>
-            <span class="nonstop-label">Nonstop</span>
-          </div>
+          <p class="back-message">
+            你決定目的地，<br/>
+            機票我來出，<br/>
+            <em>我們一起去！</em><br/><br/>
+            因為最好的旅程，<br/>
+            就是和你一起出發。
+          </p>
 
-          <div class="airport-block right">
-            <span class="airport-label">To</span>
-            <span class="airport-code dest-code">
-              <span class="q-marks">???</span>
-            </span>
-            <span class="airport-city">Your Choice</span>
+          <div class="back-footer">
+            <div class="back-footer-divider"></div>
+            <div class="back-details">
+              <div class="back-detail">
+                <span class="bd-label">From</span>
+                <span class="bd-value">TPE · Taipei</span>
+              </div>
+              <div class="back-detail center">
+                <span class="bd-label">Destination</span>
+                <span class="bd-value" style="color:var(--gold)">Anywhere ✈</span>
+              </div>
+              <div class="back-detail right">
+                <span class="bd-label">Expires</span>
+                <span class="bd-value">Never</span>
+              </div>
+            </div>
+            <button class="back-cta" id="backBtn">← Flip Back</button>
           </div>
         </div>
 
-        <div class="perforation">
-          <div class="perf-circle"></div>
-          <div class="perf-line"></div>
-          <div class="perf-circle"></div>
-        </div>
-
-        <div class="info-grid">
-          <div class="info-cell">
-            <span class="cell-label">Passenger</span>
-            <span class="cell-value">MONICA</span>
-          </div>
-          <div class="info-cell center">
-            <span class="cell-label">Birthday</span>
-            <span class="cell-value gold" style="font-size:clamp(12px,3.4vw,15px);letter-spacing:0.08em">05 · 03</span>
-          </div>
-          <div class="info-cell right">
-            <span class="cell-label">Seat</span>
-            <span class="cell-value">TOGETHER</span>
-          </div>
-
-          <div class="info-cell">
-            <span class="cell-label">Class</span>
-            <span class="cell-value">BIRTHDAY</span>
-          </div>
-          <div class="info-cell center">
-            <span class="cell-label">Flight</span>
-            <span class="cell-value">MN-0503</span>
-          </div>
-          <div class="info-cell right">
-            <span class="cell-label">Gate</span>
-            <span class="cell-value gold">∞</span>
-          </div>
-        </div>
-
-        <div class="stub">
-          <span class="stub-text">Boarding Pass</span>
-          <div class="barcode" id="barcode"></div>
-        </div>
       </div>
-
-      <!-- BACK FACE -->
-      <div class="ticket-face ticket-back-face ticket-back" id="ticketBack">
-
-        <div class="back-top">
-          <div class="back-stamp" id="backStamp">
-            <span class="stamp-text-top">Birthday</span>
-            <span class="stamp-big">05·03</span>
-            <span class="stamp-date">Monica</span>
-          </div>
-          <div class="back-divider"></div>
-          <p class="back-subtitle">Happy Birthday</p>
-          <h1 class="back-title">妞 ✦</h1>
-        </div>
-
-        <p class="back-message">
-          你決定目的地，<br/>
-          機票我來出，<br/>
-          <em>我們一起去！</em><br/><br/>
-          因為最好的旅程，<br/>
-          就是和你一起出發。
-        </p>
-
-        <div class="back-footer">
-          <div class="back-footer-divider"></div>
-          <div class="back-details">
-            <div class="back-detail">
-              <span class="bd-label">From</span>
-              <span class="bd-value">TPE · Taipei</span>
-            </div>
-            <div class="back-detail center">
-              <span class="bd-label">Destination</span>
-              <span class="bd-value" style="color:var(--gold)">Anywhere ✈</span>
-            </div>
-            <div class="back-detail right">
-              <span class="bd-label">Expires</span>
-              <span class="bd-value">Never</span>
-            </div>
-          </div>
-          <button class="back-cta" id="backBtn">← Flip Back</button>
-        </div>
-      </div>
-
-    </div><!-- ticket-inner -->
-    </div><!-- ticket-float -->
-  </div><!-- ticket-wrap -->
+    </div>
+  </div>
+  </div><!-- card-group -->
 
   <div class="tap-hint" id="tapHint" onclick="flipTicket()">
     <span class="tap-dot"></span>
-    輕點機票，開啟你的禮物
+    輕點此，開啟你的禮物
     <span class="tap-dot"></span>
   </div>
 </div>
 
 <script>
-/* ── STARS ── */
+/* ══ STARS ══ */
 (function(){
-  const c = document.getElementById('stars-canvas');
-  const ctx = c.getContext('2d');
-  let stars = [];
-
-  function resize(){
-    c.width = innerWidth; c.height = innerHeight;
-    stars = Array.from({length:180}, () => ({
-      x: Math.random()*innerWidth,
-      y: Math.random()*innerHeight,
-      r: Math.random()*1.4 + 0.2,
-      a: Math.random(),
-      speed: Math.random()*0.008 + 0.003,
-      phase: Math.random()*Math.PI*2
-    }));
-  }
-  resize();
-  window.addEventListener('resize', resize);
-
-  function draw(t){
-    ctx.clearRect(0,0,c.width,c.height);
-    stars.forEach(s => {
-      s.a = 0.3 + 0.7 * Math.abs(Math.sin(t * s.speed + s.phase));
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
-      ctx.fillStyle = `rgba(245,230,184,${s.a})`;
-      ctx.fill();
-    });
-    requestAnimationFrame(draw);
-  }
+  const c=document.getElementById('stars-canvas'), ctx=c.getContext('2d'); let stars=[];
+  function resize(){ c.width=innerWidth; c.height=innerHeight; stars=Array.from({length:180},()=>({ x:Math.random()*innerWidth, y:Math.random()*innerHeight, r:Math.random()*1.4+0.2, a:Math.random(), speed:Math.random()*0.008+0.003, phase:Math.random()*Math.PI*2 })); }
+  resize(); window.addEventListener('resize',resize);
+  function draw(t){ ctx.clearRect(0,0,c.width,c.height); stars.forEach(s=>{ s.a=0.3+0.7*Math.abs(Math.sin(t*s.speed+s.phase)); ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fillStyle=`rgba(245,230,184,${s.a})`; ctx.fill(); }); requestAnimationFrame(draw); }
   requestAnimationFrame(draw);
 })();
 
-/* ── BARCODE ── */
+/* ══ BARCODE ══ */
 (function(){
-  const bc = document.getElementById('barcode');
-  const heights = [28,18,28,14,22,28,16,24,28,20,26,14,28,18,28,20,14,28,22,26,16];
-  const widths  = [2,1,2,1,1,2,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1];
-  heights.forEach((h,i)=>{
-    const s = document.createElement('span');
-    s.style.height = h+'px';
-    s.style.width  = widths[i]+'px';
-    bc.appendChild(s);
-  });
+  const bc=document.getElementById('barcode');
+  const heights=[28,18,28,14,22,28,16,24,28,20,26,14,28,18,28,20,14,28,22,26,16];
+  const widths=[2,1,2,1,1,2,1,2,1,2,1,1,2,1,2,1,1,2,1,2,1];
+  heights.forEach((h,i)=>{ const s=document.createElement('span'); s.style.height=h+'px'; s.style.width=widths[i]+'px'; bc.appendChild(s); });
 })();
 
-/* ── FLIP ── */
-let flipped = false;
-const inner = document.getElementById('ticketInner');
-const hint  = document.getElementById('tapHint');
-const backBtn = document.getElementById('backBtn');
-const backStamp = document.getElementById('backStamp');
-const confCanvas = document.getElementById('confetti-canvas');
+/* ══ 3D TILT + FLOAT ENGINE ══ */
+const wrapEl      = document.getElementById('ticketWrap');
+const floatEl     = document.getElementById('ticketFloat');
+const glareFront  = document.getElementById('glareFront');
+const glareBack   = document.getElementById('glareBack');
+const holoFront   = document.getElementById('holoFront');
 
-function flipTicket(){
-  flipped = !flipped;
-  inner.classList.toggle('flipped', flipped);
-  hint.style.display = flipped ? 'none' : 'flex';
+const MAX_TILT  = 22;
+const FLOAT_AMP = 9;
+const FLOAT_SPD = 0.00155;
 
-  if(flipped){
-    // stamp reveal
-    setTimeout(()=>{ backStamp.style.opacity='1'; }, 600);
-    launchConfetti();
+let tx=0, ty=0, ttx=0, tty=0; // tilt current / target
+let floatY=0;
+let isOver=false, isFlipped=false;
+let t0=null;
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+
+function frame(ts){
+  if(!t0) t0=ts;
+  const elapsed=ts-t0;
+
+  // float
+  const floatTarget=isOver?0:Math.sin(elapsed*FLOAT_SPD)*FLOAT_AMP;
+  floatY=lerp(floatY,floatTarget,0.045);
+
+  // tilt
+  const sp=isOver?0.13:0.055;
+  tx=lerp(tx,isOver?ttx:0,sp);
+  ty=lerp(ty,isOver?tty:0,sp);
+
+  floatEl.style.transform=`translateY(${floatY.toFixed(3)}px) rotateX(${tx.toFixed(3)}deg) rotateY(${ty.toFixed(3)}deg)`;
+
+  // dynamic shadow
+  const d=Math.hypot(tx,ty)/MAX_TILT;
+  const sh=`0 ${(30+d*35).toFixed(0)}px ${(80+d*50).toFixed(0)}px rgba(0,0,0,${(0.6+d*0.3).toFixed(2)}), 0 0 0 1px rgba(201,168,76,0.2), 0 ${(d*12).toFixed(0)}px ${(d*30).toFixed(0)}px rgba(201,168,76,${(d*0.12).toFixed(3)})`;
+  document.querySelectorAll('.ticket-face').forEach(f=>f.style.boxShadow=sh);
+
+  updateFX(d);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ── pointer helpers ── */
+function norm(e){
+  const r=wrapEl.getBoundingClientRect();
+  const cx=e.touches?e.touches[0].clientX:e.clientX;
+  const cy=e.touches?e.touches[0].clientY:e.clientY;
+  return {
+    nx:Math.max(-1,Math.min(1,((cx-r.left)/r.width-0.5)*2)),
+    ny:Math.max(-1,Math.min(1,((cy-r.top)/r.height-0.5)*2))
+  };
+}
+function applyTilt(e){
+  const{nx,ny}=norm(e);
+  ttx=-ny*MAX_TILT;
+  tty= nx*MAX_TILT;
+}
+
+wrapEl.addEventListener('mousemove', e=>{ isOver=true; applyTilt(e); });
+wrapEl.addEventListener('mouseenter',e=>{ isOver=true; applyTilt(e); });
+wrapEl.addEventListener('mouseleave',()=>{ isOver=false; });
+wrapEl.addEventListener('touchmove', e=>{ e.preventDefault(); isOver=true; applyTilt(e); },{passive:false});
+wrapEl.addEventListener('touchstart',e=>{ isOver=true; applyTilt(e); },{passive:true});
+wrapEl.addEventListener('touchend',  ()=>{ isOver=false; });
+
+/* ── glare + holo ── */
+function updateFX(depth){
+  if(depth<0.015){
+    glareFront.style.opacity=glareBack.style.opacity=holoFront.style.opacity='0';
+    return;
+  }
+  const gx=((ty/MAX_TILT)*0.5+0.5)*100;
+  const gy=((-tx/MAX_TILT)*0.5+0.5)*100;
+  const op=Math.min(depth*0.6,0.55);
+  const grad=`radial-gradient(ellipse at ${gx.toFixed(1)}% ${gy.toFixed(1)}%, rgba(255,255,255,${op.toFixed(3)}) 0%, rgba(255,255,255,${(op*0.15).toFixed(3)}) 45%, transparent 70%)`;
+
+  if(!isFlipped){
+    glareFront.style.opacity='1';
+    glareFront.style.background=grad;
+    glareBack.style.opacity='0';
+
+    // rainbow holo angle follows tilt
+    const angle=(Math.atan2(tx,ty)*180/Math.PI+90).toFixed(1);
+    const hi=Math.min(depth*1.1,1);
+    holoFront.style.opacity=(hi*0.85).toFixed(3);
+    holoFront.style.backgroundImage=`linear-gradient(
+      ${angle}deg,
+      transparent 20%,
+      rgba(255,${Math.round(160+ty*2)},${Math.round(80-tx*2)},${(hi*0.10).toFixed(3)}) 34%,
+      rgba(255,230,60,${(hi*0.14).toFixed(3)}) 42%,
+      rgba(80,255,${Math.round(140+tx*3)},${(hi*0.10).toFixed(3)}) 50%,
+      rgba(60,190,255,${(hi*0.12).toFixed(3)}) 58%,
+      rgba(${Math.round(190+ty*2)},80,255,${(hi*0.10).toFixed(3)}) 66%,
+      transparent 80%
+    )`;
   } else {
-    backStamp.style.opacity='0';
-    stopConfetti();
+    glareBack.style.opacity='1';
+    glareBack.style.background=grad;
+    glareFront.style.opacity=holoFront.style.opacity='0';
   }
 }
 
-document.getElementById('ticketFront').addEventListener('click', flipTicket);
-backBtn.addEventListener('click', (e)=>{ e.stopPropagation(); flipTicket(); });
-document.getElementById('ticketBack').addEventListener('click', (e)=>{
-  if(e.target === backBtn || backBtn.contains(e.target)) return;
-});
+/* ══ FLIP ══ */
+const innerEl  = document.getElementById('ticketInner');
+const hint     = document.getElementById('tapHint');
+const backStamp= document.getElementById('backStamp');
+const backBtn  = document.getElementById('backBtn');
+const confCanvas=document.getElementById('confetti-canvas');
+const cardGroup= document.getElementById('cardGroup');
 
-/* ── CONFETTI ── */
-let confParts = [];
-let confRAF = null;
-let confActive = false;
+function flipTicket(){
+  isFlipped=!isFlipped;
+  innerEl.classList.toggle('flipped',isFlipped);
+  cardGroup.classList.toggle('shifted',isFlipped);
+  hint.style.display=isFlipped?'none':'flex';
+  if(isFlipped){ setTimeout(()=>{ backStamp.style.opacity='1'; },600); launchConfetti(); }
+  else { backStamp.style.opacity='0'; stopConfetti(); }
+}
 
+let pMoved=false;
+document.getElementById('ticketFront').addEventListener('pointerdown',()=>pMoved=false);
+document.getElementById('ticketFront').addEventListener('pointermove',()=>pMoved=true);
+document.getElementById('ticketFront').addEventListener('pointerup',()=>{ if(!pMoved) flipTicket(); });
+backBtn.addEventListener('click',e=>{ e.stopPropagation(); flipTicket(); });
+
+/* ══ CONFETTI ══ */
+let parts=[],cRAF=null,cActive=false;
 function launchConfetti(){
-  confActive = true;
-  confCanvas.classList.add('active');
-  confCanvas.width = innerWidth; confCanvas.height = innerHeight;
-  const colors = ['#c9a84c','#e8c96a','#f5e6b8','#ffffff','#d4a843','#ffeaa7','#ffe066','#ffd700'];
-  confParts = Array.from({length:130}, ()=>({
-    x: Math.random()*innerWidth,
-    y: -20 - Math.random()*260,
-    vx: (Math.random()-0.5)*2.5,
-    vy: 1.4 + Math.random()*2.2,
-    color: colors[Math.floor(Math.random()*colors.length)],
-    w: 5+Math.random()*7, h: 8+Math.random()*9,
-    rot: Math.random()*Math.PI*2,
-    rotV: (Math.random()-0.5)*0.18,
-    life: 1
-  }));
-  drawConfetti();
-  setTimeout(stopConfetti, 6000);
+  if(cRAF) cancelAnimationFrame(cRAF);
+  cActive=true; confCanvas.classList.add('active');
+  confCanvas.width=innerWidth; confCanvas.height=innerHeight;
+  const cols=['#c9a84c','#e8c96a','#f5e6b8','#ffffff','#d4a843','#ffeaa7','#ffe066','#ffd700'];
+  parts=Array.from({length:130},()=>({ x:Math.random()*innerWidth, y:-20-Math.random()*260, vx:(Math.random()-0.5)*2.5, vy:1.4+Math.random()*2.2, color:cols[Math.floor(Math.random()*cols.length)], w:5+Math.random()*7, h:8+Math.random()*9, rot:Math.random()*Math.PI*2, rotV:(Math.random()-0.5)*0.18, life:1 }));
+  drawConf(); setTimeout(stopConfetti,6000);
 }
-function stopConfetti(){
-  confActive = false;
-  confCanvas.classList.remove('active');
-  if(confRAF){ cancelAnimationFrame(confRAF); confRAF=null; }
-}
-function drawConfetti(){
-  if(!confActive) return;
-  const ctx = confCanvas.getContext('2d');
-  ctx.clearRect(0,0,confCanvas.width,confCanvas.height);
-  confParts.forEach(p=>{
-    p.x += p.vx; p.y += p.vy; p.rot += p.rotV;
-    // fade out only near very bottom
-    if(p.y > confCanvas.height * 0.8) p.life = Math.max(0, p.life - 0.018);
-    ctx.save();
-    ctx.globalAlpha = p.life;
-    ctx.translate(p.x, p.y);
-    ctx.rotate(p.rot);
-    ctx.fillStyle = p.color;
-    ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
-    ctx.restore();
-  });
-  confRAF = requestAnimationFrame(drawConfetti);
+function stopConfetti(){ cActive=false; confCanvas.classList.remove('active'); if(cRAF){ cancelAnimationFrame(cRAF); cRAF=null; } }
+function drawConf(){
+  if(!cActive) return;
+  const ctx=confCanvas.getContext('2d'); ctx.clearRect(0,0,confCanvas.width,confCanvas.height);
+  parts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.rot+=p.rotV; if(p.y>confCanvas.height*0.8) p.life=Math.max(0,p.life-0.018); ctx.save(); ctx.globalAlpha=p.life; ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore(); });
+  cRAF=requestAnimationFrame(drawConf);
 }
 </script>
 </body>
